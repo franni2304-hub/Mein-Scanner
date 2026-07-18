@@ -8,7 +8,7 @@ namespace OnePieceCardScanner.Recognition.OCR.CardNumberRecognition;
 
 public sealed class CardNumberRegionDetector
 {
-    private const int MaximumCandidates = 15;
+    private const int MaximumCandidates = 60;
 
     public IReadOnlyList<string> CreateCandidateImages(
         string sourceImagePath,
@@ -614,9 +614,18 @@ public sealed class CardNumberRegionDetector
                  */
                 int rightPadding =
                     Math.Max(
-                        10,
+                        12,
                         (int)Math.Round(
-                            medianHeight * 0.62));
+                            medianHeight * 0.78));
+
+                int recoveryRightPadding =
+                    Math.Max(
+                        18,
+                        (int)Math.Round(
+                            medianHeight *
+                            (window.Count < expectedCharacterCount
+                                ? 1.65
+                                : 1.20)));
 
                 int verticalPadding =
                     Math.Max(
@@ -659,6 +668,21 @@ public sealed class CardNumberRegionDetector
                         rightPadding,
                         verticalPadding,
                         verticalPadding));
+
+                /*
+                 * Recovery-Kandidat: Wenn die letzte Ziffer keine vollständige
+                 * Kontur mehr bildet, endet "combined" vor dem tatsächlichen
+                 * Zeichenende. Eine zusätzliche rechte Variante bewahrt diese
+                 * Bildinformation, ohne den kompakten Kandidaten zu ersetzen.
+                 */
+                output.Add(
+                    AddPadding(
+                        combined,
+                        imageSize,
+                        leftPadding,
+                        recoveryRightPadding,
+                        verticalPadding,
+                        verticalPadding));
             }
         }
 
@@ -691,9 +715,9 @@ public sealed class CardNumberRegionDetector
                                 medianHeight * 0.22)),
                     rightPadding:
                         Math.Max(
-                            10,
+                            18,
                             (int)Math.Round(
-                                medianHeight * 0.62)),
+                                medianHeight * 1.20)),
                     topPadding:
                         Math.Max(
                             4,
