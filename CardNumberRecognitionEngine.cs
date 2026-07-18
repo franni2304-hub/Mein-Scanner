@@ -1169,6 +1169,79 @@ public sealed class CardNumberRecognitionEngine : IDisposable
         return candidate.AverageScore > currentBest.AverageScore;
     }
 
+    private static string GetSolutionFolder()
+    {
+        DirectoryInfo? directory =
+            new DirectoryInfo(
+                AppContext.BaseDirectory);
+
+        while (directory != null)
+        {
+            bool containsSolution =
+                directory
+                    .EnumerateFiles(
+                        "*.sln",
+                        SearchOption.TopDirectoryOnly)
+                    .Any();
+
+            bool containsDataFolder =
+                Directory.Exists(
+                    Path.Combine(
+                        directory.FullName,
+                        "Data"));
+
+            if (containsSolution ||
+                containsDataFolder)
+            {
+                return directory.FullName;
+            }
+
+            directory =
+                directory.Parent;
+        }
+
+        string workingDirectory =
+            Directory.GetCurrentDirectory();
+
+        return Directory.Exists(
+            Path.Combine(
+                workingDirectory,
+                "Data"))
+            ? workingDirectory
+            : AppContext.BaseDirectory;
+    }
+
+    private static void TryDeleteDirectory(
+        string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(
+                directoryPath) ||
+            !Directory.Exists(
+                directoryPath))
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(
+                directoryPath,
+                recursive: true);
+        }
+        catch (IOException)
+        {
+            /*
+             * Temporäre OCR-Dateien dürfen ein Erkennungsergebnis nicht
+             * ungültig machen, falls OpenCV oder ein Virenscanner die Datei
+             * noch für einen kurzen Moment geöffnet hält.
+             */
+        }
+        catch (UnauthorizedAccessException)
+        {
+            /* Best-effort-Aufräumen; die Erkennung selbst bleibt gültig. */
+        }
+    }
+
     public void Dispose()
     {
         if (_isDisposed)
