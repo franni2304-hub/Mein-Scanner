@@ -349,12 +349,108 @@ public sealed class CharacterSegmenter
                 (rectangles.Count - length) *
                 1.5;
 
+            bonus +=
+                ScoreDiscardedComponents(
+                    rectangles,
+                    start,
+                    length,
+                    medianHeight) *
+                1.5;
+
+            if (length == 5)
+            {
+                int contiguousPrefixCharacters =
+                    CountContiguousDiscardedPrefixCharacters(
+                        rectangles,
+                        start,
+                        medianHeight);
+
+                bonus -=
+                    contiguousPrefixCharacters *
+                    12.0;
+
+                if (contiguousPrefixCharacters >= 2)
+                {
+                    bonus -=
+                        12.0;
+                }
+            }
+
             AddRectangleHypothesis(
                 output,
                 window,
                 $"{sourcePrefix}-{start}",
                 bonus);
         }
+    }
+
+    private static int CountContiguousDiscardedPrefixCharacters(
+        IReadOnlyList<Rect> rectangles,
+        int startIndex,
+        double medianHeight)
+    {
+        if (startIndex <= 0 ||
+            medianHeight <= 0)
+        {
+            return 0;
+        }
+
+        int count =
+            0;
+
+        Rect next =
+            rectangles[startIndex];
+
+        for (int index = startIndex - 1;
+             index >= 0;
+             index--)
+        {
+            Rect candidate =
+                rectangles[index];
+
+            int gap =
+                next.Left -
+                candidate.Right;
+
+            double centerDistance =
+                Math.Abs(
+                    (candidate.Y + candidate.Height / 2.0) -
+                    (next.Y + next.Height / 2.0));
+
+            double heightRatio =
+                candidate.Height /
+                Math.Max(
+                    1.0,
+                    medianHeight);
+
+            double aspectRatio =
+                candidate.Width /
+                (double)Math.Max(
+                    1,
+                    candidate.Height);
+
+            bool contiguous =
+                gap >= -medianHeight * 0.18 &&
+                gap <= medianHeight * 0.55 &&
+                centerDistance <= medianHeight * 0.48;
+
+            bool characterLike =
+                heightRatio >= 0.62 &&
+                heightRatio <= 1.55 &&
+                aspectRatio >= 0.06 &&
+                aspectRatio <= 1.45;
+
+            if (!contiguous ||
+                !characterLike)
+            {
+                break;
+            }
+
+            count++;
+            next = candidate;
+        }
+
+        return count;
     }
 
     private static void AddSplitHypotheses(
