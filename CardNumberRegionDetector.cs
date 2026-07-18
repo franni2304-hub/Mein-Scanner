@@ -144,7 +144,10 @@ public sealed class CardNumberRegionDetector
                         ScoreCandidateRegion(
                             rectangle,
                             source.Size(),
-                            expectedCharacterCount)
+                            expectedCharacterCount) +
+                        ScoreRightEdgeClearance(
+                            rectangle,
+                            binary)
                 })
             .OrderByDescending(candidate =>
                 candidate.Score)
@@ -801,6 +804,62 @@ public sealed class CardNumberRegionDetector
                heightScore * 0.16 +
                positionScore * 0.12 +
                areaScore * 0.10;
+    }
+
+    private static double ScoreRightEdgeClearance(
+        Rect bounds,
+        Mat binary)
+    {
+        int stripWidth =
+            Math.Clamp(
+                (int)Math.Round(
+                    bounds.Height * 0.08),
+                2,
+                5);
+
+        stripWidth =
+            Math.Min(
+                stripWidth,
+                bounds.Width);
+
+        if (stripWidth <= 0)
+        {
+            return 0;
+        }
+
+        using Mat rightEdge =
+            new(
+                binary,
+                new Rect(
+                    bounds.Right - stripWidth,
+                    bounds.Y,
+                    stripWidth,
+                    bounds.Height));
+
+        double inkRatio =
+            Cv2.CountNonZero(
+                rightEdge) /
+            (double)Math.Max(
+                1,
+                rightEdge.Width *
+                rightEdge.Height);
+
+        /*
+         * Vordergrund direkt am rechten Ausschnittrand ist ein starkes
+         * Indiz dafür, dass die letzte Ziffer abgeschnitten wurde. Ein freier
+         * Rand bevorzugt dagegen die bereits erzeugten Recovery-Varianten.
+         */
+        if (inkRatio >= 0.08)
+        {
+            return -24.0;
+        }
+
+        if (inkRatio >= 0.025)
+        {
+            return -10.0;
+        }
+
+        return 4.0;
     }
 
     private static IEnumerable<Rect> Deduplicate(
