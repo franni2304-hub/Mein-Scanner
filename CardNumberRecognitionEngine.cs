@@ -412,17 +412,29 @@ public sealed class CardNumberRecognitionEngine : IDisposable
                     maximumCandidates: 36);
 
             CandidateRecognition? best = null;
+            int evaluatedRegionCount = 0;
             foreach (string regionPath in regionPaths)
             {
                 CandidateRecognition candidate =
                     RecognizeRegion(regionPath, sourceImagePath);
+
+                evaluatedRegionCount++;
 
                 if (best == null || IsBetterCandidate(candidate, best))
                 {
                     best = candidate;
                 }
 
-                if (IsConclusiveCandidate(
+                /*
+                 * Ein rechts abgeschnittener Regionskandidat kann aus den
+                 * verbliebenen Zeichenhälften ein formal sehr überzeugendes
+                 * Datenbankergebnis (zum Beispiel OP01-044) erzeugen. Die
+                 * breiteren Recovery-Regionen stehen bewusst als weitere
+                 * Hypothesen bereit und müssen deshalb ebenfalls eine Chance
+                 * bekommen, bevor die Suche vorzeitig endet.
+                 */
+                if (evaluatedRegionCount >= 12 &&
+                    IsConclusiveCandidate(
                         best))
                 {
                     break;
