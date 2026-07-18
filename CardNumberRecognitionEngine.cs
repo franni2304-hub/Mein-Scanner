@@ -34,8 +34,8 @@ public sealed class CardNumberRecognitionResult
 
 public sealed class CardNumberRecognitionEngine : IDisposable
 {
-    private const int TopMatchesPerSegment = 5;
-    private const int MaximumDatabaseCandidates = 40;
+    private const int TopMatchesPerSegment = 8;
+    private const int MaximumDatabaseCandidates = 80;
     private const double MissingCharacterPenalty = 28.0;
     private const double ExtraSegmentPenalty = 16.0;
 
@@ -168,8 +168,8 @@ public sealed class CardNumberRecognitionEngine : IDisposable
                  * Bei einem sicheren Treffer wird keine weitere
                  * Ausschnittvariante mehr geprüft.
                  */
-                if (best.IsUsable &&
-                    best.DatabaseScore >= 96.0)
+                if (IsConclusiveCandidate(
+                        best))
                 {
                     break;
                 }
@@ -181,8 +181,8 @@ public sealed class CardNumberRecognitionEngine : IDisposable
              * Gute Scannerbilder benötigen diesen Weg normalerweise nicht.
              */
             if (best == null ||
-                !best.IsUsable ||
-                best.DatabaseScore < 82.0)
+                !IsConclusiveCandidate(
+                    best))
             {
                 CardNumberRecognitionResult fallback =
                     RecognizeCardSlowFallback(
@@ -281,7 +281,7 @@ public sealed class CardNumberRecognitionEngine : IDisposable
          * Dadurch bleibt auch der schwierige Pfad begrenzt.
          */
         foreach (string candidatePath in
-                 coarseCandidates.Take(2))
+                 coarseCandidates.Take(6))
         {
             string preparedPath =
                 CardImagePreprocessor.Prepare(
@@ -335,11 +335,6 @@ public sealed class CardNumberRecognitionEngine : IDisposable
                     candidate;
             }
 
-            if (best.IsUsable &&
-                best.DatabaseScore >= 96.0)
-            {
-                break;
-            }
         }
 
         if (best == null ||
@@ -414,7 +409,7 @@ public sealed class CardNumberRecognitionEngine : IDisposable
                 _regionDetector.CreateCandidateImagesForUnknownLength(
                     sourceImagePath,
                     temporaryFolder,
-                    maximumCandidates: 24);
+                    maximumCandidates: 36);
 
             CandidateRecognition? best = null;
             foreach (string regionPath in regionPaths)
@@ -427,10 +422,8 @@ public sealed class CardNumberRecognitionEngine : IDisposable
                     best = candidate;
                 }
 
-                if (best.IsUsable &&
-                    best.DatabaseScore >= 99.2 &&
-                    best.LengthDifference == 0 &&
-                    best.GeometryScore >= 72.0)
+                if (IsConclusiveCandidate(
+                        best))
                 {
                     break;
                 }
@@ -455,23 +448,37 @@ public sealed class CardNumberRecognitionEngine : IDisposable
         IReadOnlyList<SegmentationHypothesis> hypotheses =
             _segmenter.GenerateHypotheses(
                 regionPath,
-                maximumHypotheses: 18);
+                maximumHypotheses: 32);
 
         CandidateRecognition? best = null;
         try
         {
             foreach (SegmentationHypothesis hypothesis in hypotheses)
             {
-                IReadOnlyList<CharacterSegment> ownedSegments =
+                IReadOnlyList<CharacterSegment> originalSegments =
+                    CloneSegments(hypothesis.Segments);
+
+                CandidateRecognition originalCandidate = RecognizeSegments(
+                    originalSegments,
+                    sourceImagePath,
+                    $"{hypothesis.SourceName}:original",
+                    hypothesis.GeometryScore);
+
+                if (best == null || IsBetterCandidate(originalCandidate, best))
+                {
+                    best = originalCandidate;
+                }
+
+                IReadOnlyList<CharacterSegment> splitInput =
                     CloneSegments(hypothesis.Segments);
 
                 IReadOnlyList<CharacterSegment> splitSegments =
-                    _wideSegmentSplitter.SplitWideSegments(ownedSegments);
+                    _wideSegmentSplitter.SplitWideSegments(splitInput);
 
                 CandidateRecognition candidate = RecognizeSegments(
                     splitSegments,
                     sourceImagePath,
-                    hypothesis.SourceName,
+                    $"{hypothesis.SourceName}:wide-split",
                     hypothesis.GeometryScore);
 
                 if (best == null || IsBetterCandidate(candidate, best))
@@ -493,6 +500,20 @@ public sealed class CardNumberRecognitionEngine : IDisposable
             SourceImagePath = sourceImagePath,
             IsUsable = false
         };
+    }
+
+    private static bool IsConclusiveCandidate(
+        CandidateRecognition candidate)
+    {
+        return candidate.IsUsable &&
+               candidate.LengthDifference == 0 &&
+               candidate.DatabaseScore >= 99.7 &&
+               candidate.AverageScore >= 82.0 &&
+               candidate.GeometryScore >= 82.0 &&
+               string.Equals(
+                   candidate.GreedyText,
+                   candidate.Text,
+                   StringComparison.OrdinalIgnoreCase);
     }
 
     private CandidateRecognition RecognizeSegments(
