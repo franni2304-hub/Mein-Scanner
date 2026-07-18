@@ -220,8 +220,8 @@ public sealed class CardNumberRegionDetector
             5
         };
 
-        var allPaths =
-            new List<string>();
+        var pathsByFormat =
+            new List<IReadOnlyList<string>>();
 
         for (int formatIndex = 0;
              formatIndex < expectedLengths.Length;
@@ -244,7 +244,7 @@ public sealed class CardNumberRegionDetector
                     _ => 10
                 };
 
-            allPaths.AddRange(
+            pathsByFormat.Add(
                 CreateCandidateImages(
                     sourceImagePath,
                     expectedLength,
@@ -259,26 +259,46 @@ public sealed class CardNumberRegionDetector
             new HashSet<string>(
                 StringComparer.Ordinal);
 
-        foreach (string path in
-                 allPaths)
+        int maximumFormatCandidates =
+            pathsByFormat.Count == 0
+                ? 0
+                : pathsByFormat.Max(paths =>
+                    paths.Count);
+
+        for (int candidateIndex = 0;
+             candidateIndex < maximumFormatCandidates &&
+             accepted.Count < maximumCandidates;
+             candidateIndex++)
         {
-            string signature =
-                CalculateImageSignature(
+            foreach (IReadOnlyList<string> formatPaths in
+                     pathsByFormat)
+            {
+                if (candidateIndex >= formatPaths.Count)
+                {
+                    continue;
+                }
+
+                string path =
+                    formatPaths[candidateIndex];
+
+                string signature =
+                    CalculateImageSignature(
+                        path);
+
+                if (!signatures.Add(
+                        signature))
+                {
+                    continue;
+                }
+
+                accepted.Add(
                     path);
 
-            if (!signatures.Add(
-                    signature))
-            {
-                continue;
-            }
-
-            accepted.Add(
-                path);
-
-            if (accepted.Count >=
-                maximumCandidates)
-            {
-                break;
+                if (accepted.Count >=
+                    maximumCandidates)
+                {
+                    break;
+                }
             }
         }
 
@@ -453,6 +473,11 @@ public sealed class CardNumberRegionDetector
                     CombineAll(
                         row);
 
+                double medianHeight =
+                    GetMedian(
+                        row.Select(rectangle =>
+                            rectangle.Height));
+
                 int overlap =
                     Math.Min(
                         rowBounds.Bottom,
@@ -469,7 +494,31 @@ public sealed class CardNumberRegionDetector
                             rowBounds.Height,
                             component.Height));
 
-                if (overlapRatio >
+                double centerDistance =
+                    Math.Abs(
+                        (rowBounds.Y + rowBounds.Height / 2.0) -
+                        (component.Y + component.Height / 2.0));
+
+                double heightRatio =
+                    component.Height /
+                    Math.Max(
+                        1.0,
+                        medianHeight);
+
+                bool heightCompatible =
+                    heightRatio >= 0.28 &&
+                    heightRatio <= 2.40;
+
+                bool centerCompatible =
+                    centerDistance <=
+                    Math.Max(
+                        rowBounds.Height,
+                        medianHeight) *
+                    0.72;
+
+                if (heightCompatible &&
+                    centerCompatible &&
+                    overlapRatio >
                     bestOverlap)
                 {
                     bestOverlap =
