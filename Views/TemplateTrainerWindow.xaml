@@ -1,0 +1,83 @@
+﻿<Window x:Class="OnePieceCardScanner.Views.TemplateTrainerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OCR Template Trainer"
+        Width="1200"
+        Height="800"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ToolBar Grid.Row="0">
+
+            <Button
+                Name="OpenImageButton"
+                Content="Bild öffnen"
+                Width="120"
+                Margin="5"
+                Click="OpenImageButton_Click"/>
+
+            <Button
+                Name="SaveCharacterButton"
+                Content="Zeichen speichern"
+                Width="150"
+                Margin="5"
+                Click="SaveCharacterButton_Click"/>
+
+            <TextBlock
+                Margin="20,0,5,0"
+                VerticalAlignment="Center"
+                Text="Zeichen:"/>
+
+            <TextBox
+                Name="CharacterTextBox"
+                Width="50"
+                Height="28"
+                FontSize="20"/>
+
+        </ToolBar>
+
+        <Border
+            Grid.Row="1"
+            Background="Gray"
+            ClipToBounds="True">
+
+            <ScrollViewer
+                HorizontalScrollBarVisibility="Auto"
+                VerticalScrollBarVisibility="Auto">
+
+                <Canvas Name="ImageCanvas">
+
+                    <Image
+                        Name="MainImage"/>
+
+                    <Rectangle
+                        Name="SelectionRectangle"
+                        Stroke="Red"
+                        StrokeThickness="2"
+                        Fill="#30FF0000"
+                        Visibility="Collapsed"/>
+
+                </Canvas>
+
+            </ScrollViewer>
+
+        </Border>
+
+        <StatusBar Grid.Row="2">
+
+            <TextBlock
+                Name="StatusText"
+                Text="Bereit"/>
+
+        </StatusBar>
+
+    </Grid>
+
+</Window>

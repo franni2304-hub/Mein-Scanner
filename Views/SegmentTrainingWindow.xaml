@@ -1,0 +1,427 @@
+<Window x:Class="OnePieceCardScanner.Views.SegmentTrainingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="OCR Segment Training"
+        Width="1400"
+        Height="900"
+        MinWidth="1100"
+        MinHeight="720"
+        WindowStartupLocation="CenterOwner"
+        KeyDown="Window_KeyDown">
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <WrapPanel Grid.Row="0"
+                   Margin="0,0,0,12">
+
+            <Button Content="Zufällige Karte"
+                    Width="145"
+                    Height="38"
+                    Margin="0,0,10,0"
+                    Click="LoadRandomPreview_Click"/>
+
+            <Button Content="Eigenes Bild öffnen"
+                    Width="150"
+                    Height="38"
+                    Margin="0,0,10,0"
+                    Click="OpenImage_Click"/>
+
+            <Button Content="Bild löschen + nächste"
+                    Width="175"
+                    Height="38"
+                    Margin="0,0,10,0"
+                    Background="#FFF0F0"
+                    Click="DeleteCurrentPreview_Click"/>
+
+            <TextBlock Text="Kartennummer:"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0"/>
+
+            <TextBox x:Name="ExpectedTextBox"
+                     Width="170"
+                     Height="32"
+                     FontSize="18"
+                     VerticalContentAlignment="Center"
+                     Margin="0,0,10,0"/>
+
+            <Button Content="Segmentierung starten"
+                    Width="180"
+                    Height="38"
+                    Margin="0,0,10,0"
+                    Click="StartTraining_Click"/>
+
+            <ToggleButton x:Name="SplitModeToggle"
+                          Content="Teilmodus"
+                          Width="115"
+                          Height="38"
+                          Margin="0,0,10,0"
+                          Checked="SplitModeChanged"
+                          Unchecked="SplitModeChanged"/>
+
+            <Button Content="Rückgängig"
+                    Width="110"
+                    Height="38"
+                    Margin="0,0,10,0"
+                    Click="Undo_Click"/>
+
+            <Button Content="Zurücksetzen"
+                    Width="115"
+                    Height="38"
+                    Click="Reset_Click"/>
+        </WrapPanel>
+
+        <Border Grid.Row="1"
+                Padding="12"
+                Margin="0,0,0,12"
+                Background="#FFF7D6"
+                BorderBrush="#D6B85A"
+                BorderThickness="1"
+                CornerRadius="6">
+
+            <StackPanel>
+                <TextBlock x:Name="InstructionText"
+                           Text="Klicke auf „Zufällige Karte“."
+                           FontSize="22"
+                           FontWeight="Bold"/>
+
+                <TextBlock x:Name="ProgressText"
+                           Text="Im Teilmodus wählst du zuerst ein doppeltes Segment aus."
+                           Margin="0,6,0,0"
+                           FontSize="15"/>
+
+                <TextBlock Text="Tastatur: Leertaste = Teilmodus, Strg+Z = Rückgängig, Esc = Zurücksetzen, Enter = Speichern + nächste"
+                           Margin="0,4,0,0"
+                           Foreground="#666666"/>
+            </StackPanel>
+        </Border>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*"/>
+                <ColumnDefinition Width="12"/>
+                <ColumnDefinition Width="2*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="2*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="3*"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0"
+                        BorderBrush="#AAAAAA"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Background="#222222"
+                        Padding="6">
+
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto">
+                        <Image x:Name="SourceImage"
+                               Stretch="None"/>
+                    </ScrollViewer>
+                </Border>
+
+                <TextBlock Grid.Row="1"
+                           Text="Gefundene Segmente"
+                           FontWeight="SemiBold"
+                           Margin="0,12,0,8"/>
+
+                <Border Grid.Row="2"
+                        BorderBrush="#AAAAAA"
+                        BorderThickness="1"
+                        CornerRadius="6"
+                        Padding="8">
+
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="SegmentItems">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="122"
+                                            Height="150"
+                                            Margin="6"
+                                            Padding="5"
+                                            Tag="{Binding Index}"
+                                            Background="{Binding Background}"
+                                            BorderBrush="{Binding BorderBrush}"
+                                            BorderThickness="2"
+                                            Click="Segment_Click">
+
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                                <RowDefinition Height="Auto"/>
+                                            </Grid.RowDefinitions>
+
+                                            <TextBlock Text="{Binding IndexLabel}"
+                                                       FontWeight="Bold"
+                                                       HorizontalAlignment="Center"/>
+
+                                            <Border Grid.Row="1"
+                                                    Margin="0,6"
+                                                    Background="Black"
+                                                    BorderBrush="#CCCCCC"
+                                                    BorderThickness="1">
+                                                <Image Source="{Binding Image}"
+                                                       Stretch="Uniform"/>
+                                            </Border>
+
+                                            <TextBlock Grid.Row="2"
+                                                       Text="{Binding AssignmentLabel}"
+                                                       HorizontalAlignment="Center"
+                                                       FontWeight="Bold"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+
+            <Border Grid.Column="2"
+                    Padding="8"
+                    BorderBrush="#AAAAAA"
+                    BorderThickness="1"
+                    CornerRadius="6">
+
+                <TabControl>
+                    <TabItem Header="Segment teilen">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Segment teilen"
+                                           FontSize="20"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock Text="1. Leertaste drücken&#x0a;2. Doppeltes Segment anklicken&#x0a;3. Trennlinie einstellen&#x0a;4. Segment teilen"
+                                           Margin="0,8,0,14"/>
+
+                                <Border Height="250"
+                                        Background="Black"
+                                        BorderBrush="#CCCCCC"
+                                        BorderThickness="1">
+                                    <Image x:Name="SplitPreviewImage"
+                                           Stretch="Uniform"/>
+                                </Border>
+
+                                <TextBlock x:Name="SplitSelectionText"
+                                           Text="Kein Segment ausgewählt"
+                                           Margin="0,10,0,4"
+                                           FontWeight="SemiBold"/>
+
+                                <Slider x:Name="SplitSlider"
+                                        Minimum="1"
+                                        Maximum="10"
+                                        Value="5"
+                                        IsEnabled="False"
+                                        SmallChange="0.25"
+                                        LargeChange="1"
+                                        TickFrequency="0.25"
+                                        IsSnapToTickEnabled="False"
+                                        ValueChanged="SplitSlider_ValueChanged"/>
+
+                                <StackPanel Orientation="Horizontal"
+                                            HorizontalAlignment="Center"
+                                            Margin="0,6,0,4">
+                                    <Button Content="◀ 1 px"
+                                            Width="75"
+                                            Margin="0,0,8,0"
+                                            Click="MoveSplitLeft_Click"/>
+                                    <Button Content="1 px ▶"
+                                            Width="75"
+                                            Click="MoveSplitRight_Click"/>
+                                </StackPanel>
+
+                                <TextBlock x:Name="SplitPositionText"
+                                           Text="Trennposition: -"
+                                           Margin="0,4,0,10"/>
+
+                                <Button Content="Ausgewähltes Segment teilen"
+                                        Height="42"
+                                        IsEnabled="False"
+                                        x:Name="SplitSegmentButton"
+                                        Click="SplitSelectedSegment_Click"/>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Matcher">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Eigene OCR – Top-Treffer"
+                                           FontSize="20"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock x:Name="MatcherStatusText"
+                                           Text="Klicke links auf ein Segment."
+                                           Margin="0,6,0,10"
+                                           TextWrapping="Wrap"/>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="12"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Segment"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"/>
+
+                                        <Border Height="155"
+                                                Margin="0,5,0,0"
+                                                Background="Black"
+                                                BorderBrush="#CCCCCC"
+                                                BorderThickness="1">
+                                            <Image x:Name="SelectedSegmentImage"
+                                                   Stretch="Uniform"/>
+                                        </Border>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Bestes Template"
+                                                   FontWeight="Bold"
+                                                   HorizontalAlignment="Center"/>
+
+                                        <Border Height="155"
+                                                Margin="0,5,0,0"
+                                                Background="Black"
+                                                BorderBrush="#CCCCCC"
+                                                BorderThickness="1">
+                                            <Image x:Name="BestTemplateImage"
+                                                   Stretch="Uniform"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Grid>
+
+                                <TextBlock x:Name="BestTemplateText"
+                                           Text="Noch kein Treffer"
+                                           Margin="0,8,0,10"
+                                           TextWrapping="Wrap"/>
+
+                                <ListBox x:Name="MatcherResultsList"
+                                         Height="260"
+                                         SelectionChanged="MatcherResultsList_SelectionChanged">
+
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="4">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="42"/>
+                                                    <ColumnDefinition Width="70"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Text="{Binding Rank}"
+                                                           FontWeight="Bold"/>
+
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding CharacterText}"
+                                                           FontSize="18"
+                                                           FontWeight="Bold"/>
+
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="{Binding ScoreText}"
+                                                               FontWeight="SemiBold"/>
+                                                    <TextBlock Text="{Binding DetailText}"
+                                                               FontSize="11"
+                                                               Foreground="#666666"/>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <TabItem Header="Training">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Margin="10">
+                                <TextBlock Text="Zufallsauswahl"
+                                           FontSize="18"
+                                           FontWeight="Bold"/>
+
+                                <TextBlock x:Name="PreviewFolderText"
+                                           Text="-"
+                                           TextWrapping="Wrap"
+                                           Margin="0,6,0,4"/>
+
+                                <TextBlock x:Name="PreviewCounterText"
+                                           Text="Noch nicht geladen."/>
+
+                                <Border Margin="0,14,0,0"
+                                        Padding="10"
+                                        Background="#EEF7EE"
+                                        BorderBrush="#7EAF7E"
+                                        BorderThickness="1"
+                                        CornerRadius="5">
+
+                                    <StackPanel>
+                                        <TextBlock Text="Manuelles Training"
+                                                   FontWeight="Bold"
+                                                   FontSize="17"/>
+
+                                        <TextBlock x:Name="ManualTrainingCountText"
+                                                   Text="Karten angelernt: 0"
+                                                   Margin="0,5,0,0"
+                                                   FontSize="16"/>
+
+                                        <TextBlock x:Name="ManualSegmentCountText"
+                                                   Text="Segmente gespeichert: 0"
+                                                   Margin="0,3,0,0"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
+            </Border>
+        </Grid>
+
+        <DockPanel Grid.Row="3"
+                   Margin="0,12,0,0">
+
+            <TextBlock x:Name="StatusText"
+                       DockPanel.Dock="Left"
+                       Text="Bereit"
+                       VerticalAlignment="Center"/>
+
+            <StackPanel DockPanel.Dock="Right"
+                        Orientation="Horizontal">
+
+                <Button Content="Zuordnung speichern + nächste"
+                        Width="230"
+                        Height="42"
+                        Margin="0,0,10,0"
+                        Click="SaveAndNext_Click"/>
+
+                <Button Content="Nur speichern"
+                        Width="130"
+                        Height="42"
+                        Margin="0,0,10,0"
+                        Click="SaveAssignments_Click"/>
+
+                <Button Content="Schließen"
+                        Width="110"
+                        Height="42"
+                        Click="Close_Click"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>
