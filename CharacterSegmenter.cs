@@ -385,6 +385,9 @@ public sealed class CharacterSegmenter
                         bounds.Width));
         }
 
+        var viableSplits =
+            new List<(int Index, Rect Left, Rect Right)>();
+
         for (int index = 0;
              index < rectangles.Count;
              index++)
@@ -409,6 +412,9 @@ public sealed class CharacterSegmenter
                 continue;
             }
 
+            viableSplits.Add(
+                (index, left, right));
+
             var split =
                 rectangles.ToList();
 
@@ -432,8 +438,49 @@ public sealed class CharacterSegmenter
                 $"projection-split-selected-{index}",
                 structuralBonus: 8.0);
         }
-    }
 
+        int compoundCount =
+            0;
+
+        for (int firstIndex = 0;
+             firstIndex < viableSplits.Count && compoundCount < 6;
+             firstIndex++)
+        {
+            for (int secondIndex = firstIndex + 1;
+                 secondIndex < viableSplits.Count && compoundCount < 6;
+                 secondIndex++)
+            {
+                var compound =
+                    rectangles.ToList();
+
+                foreach ((int index, Rect splitLeft, Rect splitRight) in
+                         new[]
+                         {
+                             viableSplits[secondIndex],
+                             viableSplits[firstIndex]
+                         })
+                {
+                    compound.RemoveAt(index);
+                    compound.Insert(index, splitRight);
+                    compound.Insert(index, splitLeft);
+                }
+
+                AddRectangleHypothesis(
+                    output,
+                    compound,
+                    $"projection-double-split-{viableSplits[firstIndex].Index}-{viableSplits[secondIndex].Index}",
+                    structuralBonus: 7.0);
+
+                AddRectangleHypothesis(
+                    output,
+                    SelectLikelyCardNumberSequence(compound),
+                    $"projection-double-split-selected-{viableSplits[firstIndex].Index}-{viableSplits[secondIndex].Index}",
+                    structuralBonus: 10.0);
+
+                compoundCount++;
+            }
+        }
+    }
     private static void AddFragmentMergeHypotheses(
         ICollection<RectangleHypothesis> output,
         IReadOnlyList<Rect> rectangles)
@@ -507,6 +554,78 @@ public sealed class CharacterSegmenter
                     merged),
                 $"fragment-merge-selected-{index}",
                 structuralBonus: 6.0);
+        }
+
+        AddTouchingPairMergeHypotheses(
+            output,
+            rectangles,
+            medianHeight);
+    }
+
+    private static void AddTouchingPairMergeHypotheses(
+        ICollection<RectangleHypothesis> output,
+        IReadOnlyList<Rect> rectangles,
+        double medianHeight)
+    {
+        double medianWidth =
+            GetMedian(
+                rectangles
+                    .Where(bounds =>
+                        bounds.Height >= medianHeight * 0.65 &&
+                        !IsLikelyDashRelaxed(bounds, medianHeight))
+                    .Select(bounds =>
+                        bounds.Width));
+
+        if (medianHeight <= 0 ||
+            medianWidth <= 0)
+        {
+            return;
+        }
+
+        int added = 0;
+
+        for (int index = 0;
+             index + 1 < rectangles.Count && added < 4;
+             index++)
+        {
+            Rect left = rectangles[index];
+            Rect right = rectangles[index + 1];
+            int gap = right.Left - left.Right;
+            int overlap =
+                Math.Min(left.Bottom, right.Bottom) -
+                Math.Max(left.Top, right.Top);
+
+            double overlapRatio =
+                overlap /
+                (double)Math.Max(1, Math.Min(left.Height, right.Height));
+
+            Rect combined = Combine(left, right);
+
+            bool plausiblePair =
+                gap <= Math.Max(1.0, medianHeight * 0.05) &&
+                gap >= -medianWidth * 0.35 &&
+                overlapRatio >= 0.58 &&
+                combined.Width <= medianWidth * 1.45 &&
+                combined.Height <= medianHeight * 1.25 &&
+                !IsLikelyDashRelaxed(left, medianHeight) &&
+                !IsLikelyDashRelaxed(right, medianHeight);
+
+            if (!plausiblePair)
+            {
+                continue;
+            }
+
+            var merged = rectangles.ToList();
+            merged[index] = combined;
+            merged.RemoveAt(index + 1);
+
+            AddRectangleHypothesis(
+                output,
+                merged,
+                $"touching-pair-merge-{index}",
+                structuralBonus: 2.0);
+
+            added++;
         }
     }
 
@@ -1081,8 +1200,8 @@ public sealed class CharacterSegmenter
         int bestX =
             -1;
 
-        int bestInk =
-            int.MaxValue;
+        double bestValleyScore =
+            double.PositiveInfinity;
 
         int maximumInk =
             0;
@@ -1105,24 +1224,55 @@ public sealed class CharacterSegmenter
                     ink);
 
             if (x >= minimumSplit &&
-                x <= maximumSplit &&
-                ink < bestInk)
+                x <= maximumSplit)
             {
-                bestInk =
-                    ink;
+                int neighborInk = ink;
+                int neighborCount = 1;
 
-                bestX =
-                    x;
+                for (int offset = 1;
+                     offset <= 2;
+                     offset++)
+                {
+                    if (x - offset >= 0)
+                    {
+                        using Mat leftColumn = roi.Col(x - offset);
+                        neighborInk += Cv2.CountNonZero(leftColumn);
+                        neighborCount++;
+                    }
+
+                    if (x + offset < roi.Width)
+                    {
+                        using Mat rightColumn = roi.Col(x + offset);
+                        neighborInk += Cv2.CountNonZero(rightColumn);
+                        neighborCount++;
+                    }
+                }
+
+                double balancePenalty =
+                    Math.Abs(x - roi.Width / 2.0) /
+                    Math.Max(1.0, roi.Width) *
+                    Math.Max(1, maximumInk) *
+                    0.18;
+
+                double valleyScore =
+                    neighborInk /
+                    (double)neighborCount +
+                    balancePenalty;
+
+                if (valleyScore < bestValleyScore)
+                {
+                    bestValleyScore = valleyScore;
+                    bestX = x;
+                }
             }
         }
 
         if (bestX < 0 ||
             maximumInk <= 0 ||
-            bestInk >
+            bestValleyScore >
                 Math.Max(
-                    1,
-                    (int)Math.Round(
-                        maximumInk * 0.24)))
+                    1.25,
+                    maximumInk * 0.34))
         {
             return false;
         }
